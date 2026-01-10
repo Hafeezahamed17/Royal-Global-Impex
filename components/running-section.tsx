@@ -6,12 +6,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const images = [
-  "/assests/img1.jpeg",
-  "/assests/img2.jpeg",
-  "/assests/img3.jpeg",
-  "/assests/img4.png",
-  "/assests/img5.png",
-  "/assests/img6.png",
+  "/assests/img1.JPEG",
+"/assests/img2.JPEG",
+"/assests/img3.JPEG",
+"/assests/img4.PNG",
+"/assests/img5.PNG",
+"/assests/img6.PNG",
 ]
 
 export function RunningSection() {
