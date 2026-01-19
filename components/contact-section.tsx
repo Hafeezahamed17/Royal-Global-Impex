@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MapPin, Phone, Mail, Clock } from "lucide-react"
 
 export function ContactSection() {
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Get form data
@@ -19,33 +19,37 @@ export function ContactSection() {
       email: formData.get("email") as string,
       subject: formData.get("subject") as string,
       message: formData.get("message") as string,
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      type: "contact",
       source: "contact-section",
     }
 
-    console.log("Saving contact section data:", data) // Debug log
+    console.log("Submitting contact data:", data) // Debug log
 
     try {
-      // Get existing submissions from localStorage
-      const existingSubmissions = JSON.parse(localStorage.getItem("contactSubmissions") || "[]")
+      const response = await fetch('/api/submit-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'contact',
+          ...data,
+        }),
+      })
 
-      // Add new submission
-      const updatedSubmissions = [...existingSubmissions, data]
+      if (response.ok) {
+        console.log("Contact submission successful") // Debug log
 
-      // Save to localStorage
-      localStorage.setItem("contactSubmissions", JSON.stringify(updatedSubmissions))
+        // Show confirmation
+        alert("Your message has been sent. We'll get back to you soon!")
 
-      console.log("Contact submissions saved:", updatedSubmissions) // Debug log
-
-      // Show confirmation
-      alert("Your message has been sent. We'll get back to you soon!")
-
-      // Reset form
-      form.reset()
+        // Reset form
+        form.reset()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Submission failed')
+      }
     } catch (error) {
-      console.error("Error saving contact submission:", error)
+      console.error("Error submitting contact form:", error)
       alert("There was an error submitting your message. Please try again.")
     }
   }

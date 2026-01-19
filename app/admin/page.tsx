@@ -28,7 +28,7 @@ export default function AdminPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     // Simple password check - in a real app, use proper authentication
-    if (password === "R0yal123Gl0bal123") {
+    if (password === "R0yal4123") {
       setIsAuthenticated(true)
       setError("")
       loadSubmissions()
@@ -37,77 +37,84 @@ export default function AdminPage() {
     }
   }
 
-  const loadSubmissions = () => {
+  const loadSubmissions = async () => {
     setIsLoading(true)
     console.log("Loading submissions...") // Debug log
 
     try {
-      // Load submissions from localStorage
-      const contactSubmissions = JSON.parse(localStorage.getItem("contactSubmissions") || "[]")
-      const feedbackSubmissions = JSON.parse(localStorage.getItem("feedbackSubmissions") || "[]")
-      const inquirySubmissions = JSON.parse(localStorage.getItem("inquirySubmissions") || "[]")
+      const response = await fetch('/api/admin/submissions', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer admin-token-R0yal4123',
+        },
+      })
 
-      console.log("Contact submissions:", contactSubmissions) // Debug log
-      console.log("Feedback submissions:", feedbackSubmissions) // Debug log
-      console.log("Inquiry submissions:", inquirySubmissions) // Debug log
+      if (response.ok) {
+        const result = await response.json()
+        const submissionsData = result.submissions.map((submission: any) => ({
+          id: submission.id,
+          type: submission.type,
+          data: submission.data,
+          timestamp: submission.timestamp,
+        }))
 
-      const allSubmissions = [
-        ...contactSubmissions.map((data: any) => ({
-          id: data.id || crypto.randomUUID(),
-          type: "contact" as const,
-          data,
-          timestamp: data.timestamp || new Date().toISOString(),
-        })),
-        ...feedbackSubmissions.map((data: any) => ({
-          id: data.id || crypto.randomUUID(),
-          type: "feedback" as const,
-          data,
-          timestamp: data.timestamp || new Date().toISOString(),
-        })),
-        ...inquirySubmissions.map((data: any) => ({
-          id: data.id || crypto.randomUUID(),
-          type: "inquiry" as const,
-          data,
-          timestamp: data.timestamp || new Date().toISOString(),
-        })),
-      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-      console.log("All submissions:", allSubmissions) // Debug log
-      setSubmissions(allSubmissions)
+        console.log("Fetched submissions:", submissionsData) // Debug log
+        setSubmissions(submissionsData)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to fetch submissions')
+      }
     } catch (error) {
       console.error("Error loading submissions:", error)
+      setError("Failed to load submissions")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleDeleteSubmission = (id: string, type: string) => {
+  const handleDeleteSubmission = async (id: string, type: string) => {
     try {
-      let storageKey = ""
-      if (type === "contact") storageKey = "contactSubmissions"
-      else if (type === "feedback") storageKey = "feedbackSubmissions"
-      else if (type === "inquiry") storageKey = "inquirySubmissions"
+      const response = await fetch(`/api/admin/submissions?id=${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer admin-token-R0yal4123',
+        },
+      })
 
-      if (storageKey) {
-        const existingSubmissions = JSON.parse(localStorage.getItem(storageKey) || "[]")
-        const updatedSubmissions = existingSubmissions.filter((s: any) => s.id !== id)
-        localStorage.setItem(storageKey, JSON.stringify(updatedSubmissions))
+      if (response.ok) {
         console.log(`Deleted ${type} submission with id: ${id}`) // Debug log
+        loadSubmissions() // Refresh the list
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete submission')
       }
-
-      loadSubmissions()
     } catch (error) {
       console.error("Error deleting submission:", error)
+      alert("Failed to delete submission")
     }
   }
 
-  const clearAllData = () => {
+  const clearAllData = async () => {
     if (confirm("Are you sure you want to clear all submissions? This action cannot be undone.")) {
-      localStorage.removeItem("contactSubmissions")
-      localStorage.removeItem("feedbackSubmissions")
-      localStorage.removeItem("inquirySubmissions")
-      setSubmissions([])
-      alert("All submissions have been cleared.")
+      try {
+        // Since we don't have a clear all API, we'll delete submissions one by one
+        // In a real app, you'd have a clear all endpoint
+        const submissionsToDelete = [...submissions]
+        for (const submission of submissionsToDelete) {
+          await fetch(`/api/admin/submissions?id=${submission.id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': 'Bearer admin-token-R0yal4123',
+            },
+          })
+        }
+        setSubmissions([])
+        alert("All submissions have been cleared.")
+        loadSubmissions() // Refresh to confirm
+      } catch (error) {
+        console.error("Error clearing data:", error)
+        alert("Failed to clear all data")
+      }
     }
   }
 

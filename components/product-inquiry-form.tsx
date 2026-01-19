@@ -48,7 +48,7 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Create submission object
@@ -58,40 +58,44 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
       productName: product?.name,
       productDescription: product?.description,
       productPrice: product?.price,
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      type: "inquiry",
     }
 
-    console.log("Saving inquiry data:", submission) // Debug log
+    console.log("Submitting inquiry data:", submission) // Debug log
 
     try {
-      // Get existing submissions from localStorage
-      const existingSubmissions = JSON.parse(localStorage.getItem("inquirySubmissions") || "[]")
-
-      // Add new submission
-      const updatedSubmissions = [...existingSubmissions, submission]
-
-      // Save to localStorage
-      localStorage.setItem("inquirySubmissions", JSON.stringify(updatedSubmissions))
-
-      console.log("Inquiry submissions saved:", updatedSubmissions) // Debug log
-
-      // Show confirmation
-      alert("Your inquiry has been submitted. We'll get back to you soon!")
-
-      // Reset form and close dialog
-      setFormData({
-        customerName: "",
-        email: "",
-        country: "",
-        quantity: "",
-        shippingMethod: "",
-        message: "",
+      const response = await fetch('/api/submit-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'inquiry',
+          ...submission,
+        }),
       })
-      onClose()
+
+      if (response.ok) {
+        console.log("Inquiry submission successful") // Debug log
+
+        // Show confirmation
+        alert("Your inquiry has been submitted. We'll get back to you soon!")
+
+        // Reset form and close dialog
+        setFormData({
+          customerName: "",
+          email: "",
+          country: "",
+          quantity: "",
+          shippingMethod: "",
+          message: "",
+        })
+        onClose()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Submission failed')
+      }
     } catch (error) {
-      console.error("Error saving inquiry submission:", error)
+      console.error("Error submitting inquiry form:", error)
       alert("There was an error submitting your inquiry. Please try again.")
     }
   }
