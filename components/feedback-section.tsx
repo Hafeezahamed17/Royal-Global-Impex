@@ -27,43 +27,47 @@ export function FeedbackSection() {
     setFormData((prev) => ({ ...prev, rating: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Create submission object with timestamp and ID
+    // Create submission object
     const submission = {
       ...formData,
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      type: "feedback",
     }
 
-    console.log("Saving feedback data:", submission) // Debug log
+    console.log("Submitting feedback data:", submission) // Debug log
 
     try {
-      // Get existing submissions from localStorage
-      const existingSubmissions = JSON.parse(localStorage.getItem("feedbackSubmissions") || "[]")
-
-      // Add new submission
-      const updatedSubmissions = [...existingSubmissions, submission]
-
-      // Save to localStorage
-      localStorage.setItem("feedbackSubmissions", JSON.stringify(updatedSubmissions))
-
-      console.log("Feedback submissions saved:", updatedSubmissions) // Debug log
-
-      // Show confirmation
-      alert("Thank you for your feedback!")
-
-      // Reset form
-      setFormData({
-        name: "",
-        email: "",
-        rating: "",
-        message: "",
+      const response = await fetch('/api/submit-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'feedback',
+          ...submission,
+        }),
       })
+
+      if (response.ok) {
+        console.log("Feedback submission successful") // Debug log
+
+        // Show confirmation
+        alert("Thank you for your feedback!")
+
+        // Reset form
+        setFormData({
+          name: "",
+          email: "",
+          rating: "",
+          message: "",
+        })
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Submission failed')
+      }
     } catch (error) {
-      console.error("Error saving feedback submission:", error)
+      console.error("Error submitting feedback form:", error)
       alert("There was an error submitting your feedback. Please try again.")
     }
   }
