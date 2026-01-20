@@ -1,29 +1,17 @@
+import React from "react"
 import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
+import { ClientWrapper } from './auth-wrapper'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Royal Global Impex',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'Royal Global Impex - Global Trade Royal Standard',
+  description: 'Premium import and export services for global trade',
   icons: {
-    icon: [
-      {
-        url: '/assests/logo.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/assests/logo.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/assests/logo.png',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/assests/logo.png',
+    icon: '/favicon.ico',
+    apple: '/apple-icon.png',
   },
 }
 
@@ -44,7 +32,9 @@ html {
         `}</style>
       </head>
       <body>
-        {children}
+        <ClientWrapper>
+          {children}
+        </ClientWrapper>
         <Analytics />
       </body>
     </html>
