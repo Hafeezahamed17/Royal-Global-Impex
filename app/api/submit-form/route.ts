@@ -1,52 +1,96 @@
+import { createClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-
-const dataDir = path.join(process.cwd(), 'data')
-const submissionsFile = path.join(dataDir, 'submissions.json')
-
-// Ensure data directory exists
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true })
-}
-
-// Initialize submissions file if it doesn't exist
-if (!fs.existsSync(submissionsFile)) {
-  fs.writeFileSync(submissionsFile, JSON.stringify([]))
-}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { type, ...data } = body
+    const { type, ...formData } = body
 
-    // Validate required fields
-    if (!type || !['contact', 'feedback', 'inquiry'].includes(type)) {
-      return NextResponse.json({ error: 'Invalid submission type' }, { status: 400 })
+    const supabase = createClient()
+
+    console.log(`[v0] Processing ${type} submission:`, formData)
+
+    if (type === 'contact') {
+      const { error } = await supabase.from('contact_submissions').insert([
+        {
+          name: formData.firstName && formData.lastName 
+            ? `${formData.firstName} ${formData.lastName}` 
+            : formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          subject: formData.subject,
+          message: formData.message,
+          source: formData.source,
+        },
+      ])
+
+      if (error) {
+        console.error('[v0] Contact submission error:', error)
+        throw error
+      }
+
+      return NextResponse.json(
+        { success: true, message: 'Contact form submitted successfully' },
+        { status: 201 }
+      )
     }
 
-    // Read existing submissions
-    const submissions = JSON.parse(fs.readFileSync(submissionsFile, 'utf8'))
+    if (type === 'feedback') {
+      const { error } = await supabase.from('feedback_submissions').insert([
+        {
+          name: formData.name,
+          email: formData.email,
+          rating: formData.rating,
+          message: formData.message,
+        },
+      ])
 
-    // Create new submission
-    const submission = {
-      id: crypto.randomUUID(),
-      type,
-      data,
-      timestamp: new Date().toISOString(),
+      if (error) {
+        console.error('[v0] Feedback submission error:', error)
+        throw error
+      }
+
+      return NextResponse.json(
+        { success: true, message: 'Feedback form submitted successfully' },
+        { status: 201 }
+      )
     }
 
-    // Add to submissions
-    submissions.push(submission)
+    if (type === 'inquiry') {
+      const { error } = await supabase.from('product_inquiries').insert([
+        {
+          customer_name: formData.customerName,
+          email: formData.email,
+          country: formData.country,
+          quantity: parseInt(formData.quantity),
+          shipping_method: formData.shippingMethod,
+          message: formData.message,
+          product_id: formData.productId,
+          product_name: formData.productName,
+          product_price: formData.productPrice,
+        },
+      ])
 
-    // Write back to file
-    fs.writeFileSync(submissionsFile, JSON.stringify(submissions, null, 2))
+      if (error) {
+        console.error('[v0] Product inquiry error:', error)
+        throw error
+      }
 
-    console.log(`New ${type} submission saved:`, submission)
+      return NextResponse.json(
+        { success: true, message: 'Product inquiry submitted successfully' },
+        { status: 201 }
+      )
+    }
 
-    return NextResponse.json({ success: true, id: submission.id })
-  } catch (error) {
-    console.error('Error saving submission:', error)
-    return NextResponse.json({ error: 'Failed to save submission' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Invalid form type' },
+      { status: 400 }
+    )
+  } catch (error: any) {
+    console.error('[v0] Form submission error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to submit form' },
+      { status: 500 }
+    )
   }
 }

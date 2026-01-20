@@ -8,9 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { createClient } from "@/lib/supabase"
 
 export function ContactPopup() {
   const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const supabase = createClient()
 
   useEffect(() => {
     // Show popup after 2 seconds when site is opened
@@ -21,8 +25,10 @@ export function ContactPopup() {
     return () => clearTimeout(timer)
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setError("")
 
     // Get form data from the form elements
     const form = e.target as HTMLFormElement
@@ -34,25 +40,20 @@ export function ContactPopup() {
       email: formData.get("email") as string,
       phone: formData.get("phone") as string,
       message: formData.get("message") as string,
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
       source: "popup",
-      type: "contact",
     }
 
-    console.log("Saving contact popup data:", data) // Debug log
+    console.log("[v0] Saving contact popup data:", data)
 
     try {
-      // Get existing submissions from localStorage
-      const existingSubmissions = JSON.parse(localStorage.getItem("contactSubmissions") || "[]")
+      // Save to Supabase
+      const { error: supabaseError } = await supabase.from("contact_submissions").insert([data])
 
-      // Add new submission
-      const updatedSubmissions = [...existingSubmissions, data]
+      if (supabaseError) {
+        throw supabaseError
+      }
 
-      // Save to localStorage
-      localStorage.setItem("contactSubmissions", JSON.stringify(updatedSubmissions))
-
-      console.log("Contact submissions saved:", updatedSubmissions) // Debug log
+      console.log("[v0] Contact popup saved to Supabase")
 
       // Show confirmation
       alert("Your message has been sent. We'll get back to you soon!")
@@ -60,9 +61,11 @@ export function ContactPopup() {
       // Reset form and close popup
       form.reset()
       setIsOpen(false)
-    } catch (error) {
-      console.error("Error saving contact submission:", error)
-      alert("There was an error submitting your message. Please try again.")
+    } catch (err: any) {
+      console.error("[v0] Error saving contact submission:", err)
+      setError(err.message || "There was an error submitting your message. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -76,24 +79,42 @@ export function ContactPopup() {
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          {error && (
+            <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="popup-name">Name</Label>
-            <Input id="popup-name" name="name" placeholder="Your name" required />
+            <Input id="popup-name" name="name" placeholder="Your name" required disabled={isLoading} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="popup-email">Email</Label>
-            <Input id="popup-email" name="email" type="email" placeholder="Your email" required />
+            <Input
+              id="popup-email"
+              name="email"
+              type="email"
+              placeholder="Your email"
+              required
+              disabled={isLoading}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="popup-phone">Phone</Label>
-            <Input id="popup-phone" name="phone" placeholder="Your phone number" />
+            <Input id="popup-phone" name="phone" placeholder="Your phone number" disabled={isLoading} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="popup-message">Message</Label>
-            <Textarea id="popup-message" name="message" placeholder="How can we help you?" required />
+            <Textarea
+              id="popup-message"
+              name="message"
+              placeholder="How can we help you?"
+              required
+              disabled={isLoading}
+            />
           </div>
-          <Button type="submit" className="w-full">
-            Submit
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Submitting..." : "Submit"}
           </Button>
         </form>
       </SheetContent>

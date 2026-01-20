@@ -2,12 +2,19 @@
 
 import type React from "react"
 
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { MapPin, Phone, Mail, Clock } from "lucide-react"
 
 export function ContactSection() {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setError("")
 
     // Get form data
     const form = e.target as HTMLFormElement
@@ -22,7 +29,7 @@ export function ContactSection() {
       source: "contact-section",
     }
 
-    console.log("Submitting contact data:", data) // Debug log
+    console.log("[v0] Submitting contact data:", data)
 
     try {
       const response = await fetch('/api/submit-form', {
@@ -37,20 +44,23 @@ export function ContactSection() {
       })
 
       if (response.ok) {
-        console.log("Contact submission successful") // Debug log
+        console.log("[v0] Contact submission successful")
 
         // Show confirmation
         alert("Your message has been sent. We'll get back to you soon!")
 
         // Reset form
         form.reset()
+        setError("")
       } else {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Submission failed')
       }
-    } catch (error) {
-      console.error("Error submitting contact form:", error)
-      alert("There was an error submitting your message. Please try again.")
+    } catch (error: any) {
+      console.error("[v0] Error submitting contact form:", error)
+      setError(error.message || "There was an error submitting your message. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -122,6 +132,11 @@ export function ContactSection() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                    {error}
+                  </div>
+                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label
@@ -136,6 +151,7 @@ export function ContactSection() {
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       placeholder="John"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -151,6 +167,7 @@ export function ContactSection() {
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       placeholder="Doe"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -168,6 +185,7 @@ export function ContactSection() {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="john.doe@example.com"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -183,6 +201,7 @@ export function ContactSection() {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="How can we help you?"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -198,13 +217,15 @@ export function ContactSection() {
                     className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="Enter your message here"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <button
                   type="submit"
                   className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                  disabled={isLoading}
                 >
-                  Send Message
+                  {isLoading ? "Sending..." : "Send Message"}
                 </button>
               </form>
             </CardContent>

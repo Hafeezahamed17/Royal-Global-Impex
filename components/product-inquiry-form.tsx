@@ -38,6 +38,8 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
     shippingMethod: "",
     message: "",
   })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -50,6 +52,8 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setError("")
 
     // Create submission object
     const submission = {
@@ -60,7 +64,7 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
       productPrice: product?.price,
     }
 
-    console.log("Submitting inquiry data:", submission) // Debug log
+    console.log("[v0] Submitting inquiry data:", submission)
 
     try {
       const response = await fetch('/api/submit-form', {
@@ -75,7 +79,7 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
       })
 
       if (response.ok) {
-        console.log("Inquiry submission successful") // Debug log
+        console.log("[v0] Inquiry submission successful")
 
         // Show confirmation
         alert("Your inquiry has been submitted. We'll get back to you soon!")
@@ -89,14 +93,17 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
           shippingMethod: "",
           message: "",
         })
+        setError("")
         onClose()
       } else {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Submission failed')
       }
-    } catch (error) {
-      console.error("Error submitting inquiry form:", error)
-      alert("There was an error submitting your inquiry. Please try again.")
+    } catch (error: any) {
+      console.error("[v0] Error submitting inquiry form:", error)
+      setError(error.message || "There was an error submitting your inquiry. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -117,6 +124,11 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="customerName">Full Name</Label>
             <Input
@@ -126,6 +138,7 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
               onChange={handleChange}
               placeholder="Your full name"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -139,6 +152,7 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
               onChange={handleChange}
               placeholder="Your email address"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -151,6 +165,7 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
               onChange={handleChange}
               placeholder="Your country"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -163,6 +178,7 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
               onChange={handleChange}
               placeholder="Required quantity"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -171,8 +187,9 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
             <Select
               value={formData.shippingMethod}
               onValueChange={(value) => handleSelectChange("shippingMethod", value)}
+              disabled={isLoading}
             >
-              <SelectTrigger id="shippingMethod">
+              <SelectTrigger id="shippingMethod" disabled={isLoading}>
                 <SelectValue placeholder="Select shipping method" />
               </SelectTrigger>
               <SelectContent>
@@ -193,14 +210,17 @@ export function ProductInquiryForm({ isOpen, onClose, product }: ProductInquiryF
               onChange={handleChange}
               placeholder="Any specific requirements or questions"
               rows={3}
+              disabled={isLoading}
             />
           </div>
 
           <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit">Submit Inquiry</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Submitting..." : "Submit Inquiry"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

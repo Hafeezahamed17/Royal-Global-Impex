@@ -1,14 +1,15 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-import { RefreshCw } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase"
+import { RefreshCw, LogOut } from "lucide-react"
 
 type FormSubmission = {
   id: string
@@ -18,55 +19,64 @@ type FormSubmission = {
 }
 
 export default function AdminPage() {
+  const { user, loading: authLoading, logout, isAuthenticated } = useAuth()
   const [submissions, setSubmissions] = useState<FormSubmission[]>([])
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-
-  // Simple authentication - in a real app, use proper authentication
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Simple password check - in a real app, use proper authentication
-    if (password === "R0yal4123") {
-      setIsAuthenticated(true)
-      setError("")
-      loadSubmissions()
-    } else {
-      setError("Invalid password")
-    }
-  }
+  const [error, setError] = useState("")
+  const router = useRouter()
+  const supabase = createClient()
 
   const loadSubmissions = async () => {
     setIsLoading(true)
-    console.log("Loading submissions...") // Debug log
+    setError("")
 
     try {
-      const response = await fetch('/api/admin/submissions', {
-        method: 'GET',
-        headers: {
-          'Authorization': 'Bearer admin-token-R0yal4123',
-        },
-      })
+      const [contactData, feedbackData, inquiryData] = await Promise.all([
+        supabase.from("contact_submissions").select("*").order("created_at", { ascending: false }),
+        supabase.from("feedback_submissions").select("*").order("created_at", { ascending: false }),
+        supabase.from("product_inquiries").select("*").order("created_at", { ascending: false }),
+      ])
 
-      if (response.ok) {
-        const result = await response.json()
-        const submissionsData = result.submissions.map((submission: any) => ({
-          id: submission.id,
-          type: submission.type,
-          data: submission.data,
-          timestamp: submission.timestamp,
-        }))
+      const allSubmissions: FormSubmission[] = []
 
-        console.log("Fetched submissions:", submissionsData) // Debug log
-        setSubmissions(submissionsData)
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to fetch submissions')
+      if (contactData.data) {
+        allSubmissions.push(
+          ...contactData.data.map((item: any) => ({
+            id: item.id,
+            type: "contact" as const,
+            data: item,
+            timestamp: item.created_at,
+          }))
+        )
       }
-    } catch (error) {
-      console.error("Error loading submissions:", error)
-      setError("Failed to load submissions")
+
+      if (feedbackData.data) {
+        allSubmissions.push(
+          ...feedbackData.data.map((item: any) => ({
+            id: item.id,
+            type: "feedback" as const,
+            data: item,
+            timestamp: item.created_at,
+          }))
+        )
+      }
+
+      if (inquiryData.data) {
+        allSubmissions.push(
+          ...inquiryData.data.map((item: any) => ({
+            id: item.id,
+            type: "inquiry" as const,
+            data: item,
+            timestamp: item.created_at,
+          }))
+        )
+      }
+
+      allSubmissions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      setSubmissions(allSubmissions)
+    } catch (err: any) {
+      console.error("Error loading submissions:", err)
+      setError(err.message || "Failed to load submissions")
     } finally {
       setIsLoading(false)
     }
@@ -74,86 +84,73 @@ export default function AdminPage() {
 
   const handleDeleteSubmission = async (id: string, type: string) => {
     try {
-      const response = await fetch(`/api/admin/submissions?id=${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Bearer admin-token-R0yal4123',
-        },
-      })
+      let tableName = ""
+      if (type === "contact") tableName = "contact_submissions"
+      else if (type === "feedback") tableName = "feedback_submissions"
+      else if (type === "inquiry") tableName = "product_inquiries"
 
-      if (response.ok) {
-        console.log(`Deleted ${type} submission with id: ${id}`) // Debug log
-        loadSubmissions() // Refresh the list
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete submission')
+      if (tableName) {
+        const { error } = await supabase.from(tableName).delete().eq("id", id)
+
+        if (error) throw error
+
+        loadSubmissions()
       }
-    } catch (error) {
-      console.error("Error deleting submission:", error)
-      alert("Failed to delete submission")
+    } catch (err: any) {
+      console.error("Error deleting submission:", err)
+      setError(err.message || "Failed to delete submission")
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/")
+    } catch (err: any) {
+      console.error("Logout error:", err)
     }
   }
 
   const clearAllData = async () => {
-    if (confirm("Are you sure you want to clear all submissions? This action cannot be undone.")) {
-      try {
-        // Since we don't have a clear all API, we'll delete submissions one by one
-        // In a real app, you'd have a clear all endpoint
-        const submissionsToDelete = [...submissions]
-        for (const submission of submissionsToDelete) {
-          await fetch(`/api/admin/submissions?id=${submission.id}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': 'Bearer admin-token-R0yal4123',
-            },
-          })
-        }
-        setSubmissions([])
-        alert("All submissions have been cleared.")
-        loadSubmissions() // Refresh to confirm
-      } catch (error) {
-        console.error("Error clearing data:", error)
-        alert("Failed to clear all data")
-      }
+    try {
+      const { error } = await supabase
+        .from("contact_submissions")
+        .delete()
+      if (error) throw error
+
+      const { error: feedbackError } = await supabase
+        .from("feedback_submissions")
+        .delete()
+      if (feedbackError) throw feedbackError
+
+      const { error: inquiryError } = await supabase
+        .from("product_inquiries")
+        .delete()
+      if (inquiryError) throw inquiryError
+
+      loadSubmissions()
+    } catch (err: any) {
+      console.error("Error clearing all data:", err)
+      setError(err.message || "Failed to clear all data")
     }
   }
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/admin/login")
+    } else if (!authLoading && isAuthenticated) {
       loadSubmissions()
     }
-  }, [isAuthenticated])
+  }, [authLoading, isAuthenticated, router])
 
-  if (!isAuthenticated) {
+  if (authLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <Navbar />
         <main className="flex-1 flex items-center justify-center">
           <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Admin Login</CardTitle>
-              <CardDescription>Enter your password to access the admin dashboard</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                {error && <p className="text-destructive">{error}</p>}
-                <div className="space-y-2">
-                  <label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  Login
-                </Button>
-              </form>
+            <CardContent className="p-6 text-center">
+              <p className="text-muted-foreground">Loading...</p>
             </CardContent>
           </Card>
         </main>
@@ -162,26 +159,39 @@ export default function AdminPage() {
     )
   }
 
+  if (!isAuthenticated) {
+    return null
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 container py-12">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <div>
+            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">Logged in as: {user?.email}</p>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={loadSubmissions} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
-            <Button variant="destructive" onClick={clearAllData}>
-              Clear All Data
-            </Button>
-            <Button variant="outline" onClick={() => setIsAuthenticated(false)}>
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
           </div>
         </div>
 
+        {error && (
+          <Card className="mb-6 border-destructive bg-destructive/10">
+            <CardContent className="p-4 text-destructive">
+              <p className="font-medium">Error</p>
+              <p className="text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        )}
         <div className="mb-6 p-4 bg-muted rounded-lg">
           <h3 className="font-semibold mb-2">Statistics</h3>
           <div className="grid grid-cols-4 gap-4 text-center">
